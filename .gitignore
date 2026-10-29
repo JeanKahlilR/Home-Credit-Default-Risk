@@ -1,34 +1,18 @@
-# Ambientes virtuais e Python
-.venv/
-venv/
-env/
+data/
+notebooks/data/
+*.csv
+*.parquet
+*.crc
+_SUCCESS
+.ipynb_checkpoints/
+.virtual_documents/
 __pycache__/
 *.py[cod]
-*$py.class
-.ipynb_checkpoints/
-
-# Spark & Metastore local
-metastore_db/
-derby.log
-.spark-staging/
-
-# Dados (Arquitetura Medalhão Local)
-# Ignora arquivos de dados dentro de data/, preservando a estrutura
-data/bronze/*
-!data/bronze/.gitkeep
-data/silver/*
-!data/silver/.gitkeep
-data/gold/*
-!data/gold/.gitkeep
-
-# Modelos treinados e artefatos de build
-models/*
-!models/.gitkeep
-*.pkl
+models/
 *.joblib
-*.onnx
-
-# IDE e Sistema Operacional
+*.pkl
+*.log
+.env
+.venv/
+venv/
 .vscode/
-.idea/
-.DS_Store
