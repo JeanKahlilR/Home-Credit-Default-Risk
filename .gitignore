@@ -16,3 +16,6 @@ models/
 .venv/
 venv/
 .vscode/
+
+catboost_info/
+notebooks/catboost_info/
