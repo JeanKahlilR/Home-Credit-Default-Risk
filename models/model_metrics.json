@@ -1,0 +1,135 @@
+{
+    "project_name": "Credit Scoring & MLOps Pipeline (Home Credit Default Risk - MVP)",
+    "model_version": "1.0.0-mvp",
+    "created_at_utc": "2026-10-31T21:00:28Z",
+    "git_branch": "feature/model-training-evaluation",
+    "champion_algorithm": "CatBoostClassifier",
+    "best_hyperparameters": {
+        "auto_class_weights": "Balanced",
+        "depth": 4,
+        "learning_rate": 0.08,
+        "l2_leaf_reg": 5.0,
+        "iterations": 350,
+        "random_seed": 42
+    },
+    "data_split_summary": {
+        "total_records": 307511,
+        "train_records": 215257,
+        "validation_records": 46127,
+        "test_records": 46127,
+        "portfolio_base_bad_rate_pct": 8.0729,
+        "imbalance_ratio": 11.39
+    },
+    "api_input_contract": {
+        "total_features": 12,
+        "numeric_features": [
+            "EXT_SOURCE_3",
+            "EXT_SOURCE_2",
+            "AGE_YEARS",
+            "YEARS_EMPLOYED",
+            "BUREAU_ACTIVE_LOANS",
+            "BUREAU_TOTAL_CREDIT_DEBT",
+            "DTI_RATIO",
+            "AMT_CREDIT",
+            "AMT_INCOME_TOTAL",
+            "FLAG_OWN_CAR"
+        ],
+        "categorical_features": [
+            "NAME_INCOME_TYPE",
+            "NAME_EDUCATION_TYPE"
+        ],
+        "dropped_collinear_features": [
+            "AMT_ANNUITY",
+            "AMT_GOODS_PRICE",
+            "FLAG_OWN_REALTY",
+            "BUREAU_TOTAL_LOANS",
+            "BUREAU_TOTAL_CREDIT_SUM",
+            "CREDIT_INCOME_RATIO"
+        ]
+    },
+    "decision_thresholds": {
+        "optimal_threshold": 0.5027,
+        "threshold_ks_max_protection": 0.5027,
+        "threshold_f1_max_commercial": 0.64,
+        "traffic_light_bands": {
+            "green_auto_approve_below": 0.5027,
+            "yellow_manual_review_between": [
+                0.5027,
+                0.64
+            ],
+            "red_auto_reject_above_or_equal": 0.64
+        }
+    },
+    "validation_metrics": {
+        "roc_auc": 0.7404,
+        "ks_statistic_pct": 36.64,
+        "recall_at_ks_threshold": 0.6762,
+        "f1_at_commercial_threshold": 0.2919
+    },
+    "test_holdout_metrics": {
+        "roc_auc": 0.7353,
+        "roc_auc_ci95_bootstrap": [
+            0.7274,
+            0.7437
+        ],
+        "ks_statistic_pct": 34.79,
+        "policy_ks_protection_0_5027": {
+            "threshold": 0.5027,
+            "approval_rate_pct": 66.41,
+            "approved_portfolio_bad_rate_pct": 4.19,
+            "relative_risk_reduction_pct": -48.12,
+            "recall_bads_captured_pct": 65.55,
+            "precision_rejected_pct": 15.75,
+            "f1_score": 0.254,
+            "f2_score": 0.4016,
+            "confusion_matrix": {
+                "TN": 29348,
+                "FP": 13055,
+                "FN": 1283,
+                "TP": 2441
+            }
+        },
+        "policy_f1_commercial_0_6400": {
+            "threshold": 0.64,
+            "approval_rate_pct": 84.46,
+            "approved_portfolio_bad_rate_pct": 5.58,
+            "relative_risk_reduction_pct": -30.88,
+            "recall_bads_captured_pct": 41.62,
+            "precision_rejected_pct": 21.63,
+            "f1_score": 0.2847,
+            "f2_score": 0.3513,
+            "confusion_matrix": {
+                "TN": 36787,
+                "FP": 5616,
+                "FN": 2174,
+                "TP": 1550
+            }
+        }
+    },
+    "ab_hypothesis_testing_test_set": {
+        "z_test_bad_rate_reduction": {
+            "z_statistic": -21.3445,
+            "p_value": 2.1945e-101,
+            "statistically_significant": true
+        },
+        "chi2_independence_and_odds_ratio": {
+            "chi2_statistic": 1852.56,
+            "odds_ratio_rejected_vs_approved": 4.28,
+            "statistically_significant": true
+        }
+    },
+    "feature_importance_contract_pct": {
+        "EXT_SOURCE_2": 27.56,
+        "EXT_SOURCE_3": 26.07,
+        "AMT_CREDIT": 9.3,
+        "YEARS_EMPLOYED": 7.04,
+        "AGE_YEARS": 6.94,
+        "NAME_EDUCATION_TYPE": 5.34,
+        "DTI_RATIO": 4.67,
+        "AMT_INCOME_TOTAL": 3.47,
+        "BUREAU_TOTAL_CREDIT_DEBT": 3.17,
+        "BUREAU_ACTIVE_LOANS": 2.83,
+        "NAME_INCOME_TYPE": 2.37,
+        "FLAG_OWN_CAR": 1.23
+    }
+}

@@ -1,21 +1,27 @@
+# Dados (Camadas do Data Lakehouse)
 data/
 notebooks/data/
 *.csv
 *.parquet
 *.crc
 _SUCCESS
+
+# Checkpoints e Arquivos Temporários de IDE/Jupyter
 .ipynb_checkpoints/
 .virtual_documents/
 __pycache__/
 *.py[cod]
-models/
-*.joblib
-*.pkl
+.vscode/
+
+# Logs e Telemetria de Treino
 *.log
+catboost_info/
+notebooks/catboost_info/
+
+# Ambientes Virtuais
 .env
 .venv/
 venv/
-.vscode/
 
-catboost_info/
-notebooks/catboost_info/
+# Binários genéricos (o pipeline oficial em models/ será versionado)
+*.pkl
