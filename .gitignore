@@ -25,3 +25,6 @@ venv/
 
 # Binários genéricos (o pipeline oficial em models/ será versionado)
 *.pkl
+
+# Cache de testes
+.pytest_cache/
