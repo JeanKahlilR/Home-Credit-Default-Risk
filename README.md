@@ -1,281 +1,254 @@
 # 🏦 Sistema de Escoragem de Risco de Crédito (*Credit Scoring*) — Home Credit
 
-> **Projeto de Engenharia de Machine Learning e Ciência de Dados** voltado à predição de probabilidade de inadimplência (*Probability of Default - PD*) e apoio automatizado à tomada de decisão na concessão de crédito, desenvolvido sob a metodologia **CRISP-DM** com foco em entrega de **MVP (*Minimum Viable Product*)** de alta performance.
+> **Projeto de Engenharia de Dados e Machine Learning** voltado à estimativa de probabilidade de inadimplência (*Probability of Default - PD*) e ao apoio à decisão na concessão de crédito, estruturado segundo a metodologia **CRISP-DM** com foco na construção de um **MVP (*Minimum Viable Product*)** funcional de ponta a ponta.
+
+---
+
+## 🌐 Acesso à Aplicação Publicada (Ambiente de Demonstração)
+
+A solução encontra-se publicada em ambiente de nuvem gratuito para testes e simulações em tempo real:
+
+* **🖥️ Aplicação Web (Mesa de Crédito — Streamlit):** [https://home-credit-default-risk-jkr.streamlit.app/](https://home-credit-default-risk-jkr.streamlit.app/)
+* **🔌 Documentação Interativa da API (FastAPI — Swagger UI):** [https://home-credit-risk-api-e6n6.onrender.com/docs](https://home-credit-risk-api-e6n6.onrender.com/docs)
+
+> **Nota sobre o ambiente gratuito:** A API está hospedada na camada gratuita do *Render*, que entra em modo de espera após 15 minutos de inatividade. Na primeira requisição, o serviço pode levar cerca de 40 a 50 segundos para ser reativado; as consultas subsequentes respondem normalmente em milissegundos.
 
 ---
 
 ## 📌 1. Contexto de Negócio e Metodologia (CRISP-DM)
 
-Instituições financeiras enfrentam continuamente o dilema entre **maximizar a inclusão financeira** (aprovar bons pagadores que frequentemente possuem histórico de crédito limitado) e **proteger o capital contra o risco de calote (*default*)**.
+Na concessão de crédito ao consumidor, busca-se equilibrar dois objetivos complementares: **ampliar o acesso ao crédito** para bons pagadores (incluindo clientes com histórico bancário reduzido) e **controlar a exposição ao risco de inadimplência (*default*)**.
 
-Neste projeto, utilizou-se a base histórica da *Home Credit* ($307.511$ solicitações de empréstimo distribuídas em múltiplas tabelas relacionais) para o desenvolvimento de uma solução ponta a ponta voltada a:
+Neste projeto, utilizou-se a base histórica da *Home Credit* ($307.511$ solicitações de empréstimo acompanhadas de registros de birô de crédito) para estruturar um fluxo analítico com três propósitos principais:
 
-1. Consolidar o histórico cadastral e de birô de crédito (*Bureau*) em uma tabela analítica íntegra (*Analytical Base Table - ABT*).
-2. Estimar a probabilidade de atraso severo de parcelas (`TARGET = 1`) por meio de um **MVP enxuto fundamentado nos 5 Cs do Crédito**.
-3. Traduzir o *score* matemático em uma **Política de Crédito de 3 Faixas (Semáforo de Decisão)** auditável e pronta para operação via API.
-
----
-
-## 🗺️ 2. Roadmap de Execução (Fases do CRISP-DM)
-
-O ciclo de vida do projeto foi estruturado conforme as etapas clássicas do **CRISP-DM**, conectando o entendimento de negócio ao *deploy* produtivo:
-
-- [x] **Fase 1 — *Business & Data Understanding / Data Preparation* (Arquitetura Medallion):** Compreensão das regras de concessão, ingestão de dados relacionais brutos (*Raw/Bronze*), agregação e transformação distribuída via **PySpark** (*Silver*) e construção de *features* de domínio financeiro em formato colunar `.parquet` (*Gold*).
-- [x] **Fase 2 — *Exploratory Data Analysis & Feature Selection* (MVP & 5 Cs do Crédito):** Análise exploratória orientada a hipóteses, diagnóstico de assimetria e desbalanceamento, poda de multicolinearidade e definição do contrato enxuto do MVP ancorado nos **5 Cs do Crédito**.
-- [x] **Fase 3 — *Modeling & Statistical Evaluation* (Torneio de Modelos & Política de Crédito):** Prevenção de vazamento de dados via `Pipeline` + `ColumnTransformer`, competição de algoritmos com validação cruzada estratificada, calibração de limiares de negócio ($F_1$, $F_2$ e KS) e validação de significância estatística (*Bootstrap* e Teste Z).
-- [x] **Fase 4 — *Deployment: Microsserviço REST & Containerização*:** Exposição do pipeline serializado em API REST (**FastAPI**), contratos estritos de validação de payload (**Pydantic**), suíte de testes automatizados (**Pytest**) e empacotamento reprodutível em **Docker**.
-- [x] **Fase 5 — *Business Simulation & Executive Pitch*:** Interface executiva interativa em **Streamlit** consumindo a API para simulação individual de propostas (Motor de Decisão) e avaliação financeira da carteira.
+1. Consolidar dados cadastrais e histórico de mercado (*Bureau*) em uma tabela analítica padronizada (*Analytical Base Table - ABT*).
+2. Estimar a probabilidade de inadimplência (`TARGET = 1`) por meio de um conjunto enxuto de variáveis alinhadas aos **5 Cs do Crédito**.
+3. Combinar o *score* probabilístico do modelo com regras prudenciais de negócio, organizando a recomendação operacional em três faixas de decisão.
 
 ---
 
-## 🏗️ 3. Engenharia de Dados e Arquitetura Medallion (*Data Preparation*)
+## 🗺️ 2. Etapas do Projeto (Ciclo CRISP-DM)
 
-Para o processamento de mais de $307\text{ mil}$ contratos principais (`application_train.csv`) cruzados com mais de $1,7\text{ milhão}$ de registros históricos de outras instituições financeiras (`bureau.csv`), implementou-se um pipeline analítico de alta performance utilizando **PySpark** e armazenamento **Apache Parquet**.
+O desenvolvimento foi dividido em cinco fases sequenciais, conectando a preparação dos dados à disponibilização do serviço:
 
-### Estrutura das Camadas de Dados
-
-* **Camada Bronze (`data/bronze/`):** Dados brutos originais em CSV, preservados de forma imutável.
-* **Camada Silver (`data/silver/`):** Processamento no notebook `notebooks/ELT.ipynb` via PySpark executando `LEFT JOIN` entre a proposta atual e as agregações históricas do birô por cliente (`SK_ID_CURR`), assegurando **cardinalidade estrita** $1:1$ (ausência de duplicação de linhas).
-* **Camada Gold (`data/gold/abt_credit_risk.parquet`):** Tabela Analítica Final (*ABT*) devidamente tipada, saneada de anomalias cadastrais (ex.: conversão do marcador `365243` em `DAYS_EMPLOYED` para `NULL`) e enriquecida com variáveis de negócio, comprimida de centenas de megabytes para $\approx 13\text{ MB}$.
-
-### Engenharia de Atributos (*Feature Engineering*) de Domínio Bancário
-
-Além das variáveis originais de cadastro e birô, foram derivadas razões financeiras fundamentais para a análise de capacidade de pagamento:
-
-* `AGE_YEARS` e `YEARS_EMPLOYED`: Conversão da contagem regressiva de dias (`DAYS_BIRTH` e `DAYS_EMPLOYED`) para escala positiva em anos.
-* `CREDIT_TO_INCOME_RATIO`: Comprometimento total de renda em relação ao montante financiado ($\frac{\text{AMT\_CREDIT}}{\text{AMT\_INCOME\_TOTAL}}$).
-* `ANNUITY_TO_INCOME_RATIO`: Comprometimento mensal da renda com a parcela do empréstimo ($\frac{\text{AMT\_ANNUITY}}{\text{AMT\_INCOME\_TOTAL}}$ — *Debt-to-Income / DTI*).
-* `CREDIT_TO_GOODS_RATIO`: Razão de financiamento sobre o valor real do bem ($\frac{\text{AMT\_CREDIT}}{\text{AMT\_GOODS\_PRICE}}$ — *Loan-to-Value / LTV*).
-* Agregações do Birô: `BUREAU_TOTAL_LOANS`, `BUREAU_ACTIVE_LOANS`, `BUREAU_TOTAL_CREDIT_SUM`, `BUREAU_TOTAL_DEBT_SUM` e `BUREAU_MAX_OVERDUE`.
+- [x] **Fase 1 — Entendimento dos Dados e Engenharia ELT (Arquitetura Medalhão):** Ingestão de dados brutos (*Bronze*), higienização e padronização via **PySpark** (*Silver*) e agregação relacional em formato colunar `.parquet` (*Gold*).
+- [x] **Fase 2 — Análise Exploratória (EDA) e Seleção de Variáveis:** Investigação das distribuições estatísticas, avaliação de valores ausentes e correlações, e definição das 12 variáveis do MVP com base nos **5 Cs do Crédito**.
+- [x] **Fase 3 — Modelagem Preditiva e Calibração de Limiares:** Construção do pipeline de pré-processamento (`Pipeline` + `ColumnTransformer`), avaliação comparativa de algoritmos com validação cruzada estratificada e definição das faixas operacionais de corte.
+- [x] **Fase 4 — Serviço de Inferência REST e Containerização:** Disponibilização do pipeline via **FastAPI** (predições unitárias e em lote), validação de contratos de entrada com **Pydantic**, testes automatizados com **Pytest** e empacotamento em **Docker**.
+- [x] **Fase 5 — Simulação de Negócio e Interface Corporativa:** Aplicação interativa em **Streamlit** integrando o *score* estatístico a travas de política institucional (*Hard Rules*), orquestrada localmente via **Docker Compose** e publicada em nuvem.
 
 ---
 
-## 📊 4. Análise Exploratória (EDA) e Design do MVP pelos 5 Cs do Crédito
+## 🏗️ 3. Engenharia de Dados e Arquitetura Medalhão (*ELT*)
 
-Toda a arquitetura de pré-processamento e seleção de variáveis do modelo foi orientada por evidências estatísticas obtidas na etapa de EDA (`notebooks/EDA_modeling_pipeline.ipynb`).
+Para processar os $307.511$ contratos principais (`application_train.csv`) em conjunto com $1.716.428$ registros históricos de créditos em outras instituições (`bureau.csv`), implementou-se uma esteira local em **PySpark** documentada no notebook `notebooks/ELT.ipynb`.
 
-### 4.1. Desbalanceamento Severo da Classe Alvo (`TARGET`)
+### Estrutura das Camadas
 
-A carteira apresenta uma taxa basal de inadimplência (*Bad Rate*) de $8,07\%$ ($24.825$ inadimplentes) contra $91,93\%$ de adimplentes ($282.686$ contratos), configurando uma razão de desbalanceamento de $11,39 : 1$.
+* **Camada Bronze (`data/bronze/`):** Armazenamento dos arquivos CSV originais sem alterações semânticas.
+* **Camada Silver (`data/silver/`):** Padronização de tipagem e tratamento de inconsistências cadastrais e contábeis:
+  * Conversão de datas relativas negativas (`DAYS_BIRTH` e `DAYS_EMPLOYED`) para escala positiva em anos (`AGE_YEARS` e `YEARS_EMPLOYED`).
+  * Substituição do código sentinela `365243` em `DAYS_EMPLOYED` por `Null` (valor presente majoritariamente em registros de aposentados e proponentes sem vínculo ativo).
+  * Ajuste de saldos devedores negativos na base do birô (`AMT_CREDIT_SUM_DEBT < 0` ajustados para `0.0`) e conversão de flags textuais (`'Y'`/`'N'`) em inteiros binários (`1`/`0`).
+  * Manutenção dos valores ausentes originais nas variáveis contínuas para que a imputação ocorra apenas dentro do pipeline de treinamento.
+* **Camada Gold (`data/gold/abt_credit_risk.parquet`):** Sumarização prévia da tabela `bureau` por proponente (`SK_ID_CURR`) seguida de `LEFT JOIN` com a tabela de propostas, preservando a proporção de $1:1$ ($307.511$ linhas e $20$ colunas) e evitando duplicação de registros. Os proponentes sem histórico prévio no birô ($14,31\%$ da base) tiveram suas contagens e somas de mercado preenchidas com zero.
 
-* **Decisão Metodológica:** A métrica de *Acurácia* foi descartada (um classificador ingênuo obteria $91,93\%$ de acerto aprovando $100\%$ da base). Estabeleceu-se amostragem estratificada (`stratify=y`), ponderação de custo na função de perda (`class_weight='balanced'`) e avaliação orientada por **ROC-AUC**, **PR-AUC** e **Estatística KS**.
+### Atributos Derivados na Camada Gold
 
-### 4.2. Assimetria Extrema (*Skewness*) e Imputação Resiliente
-
-A análise descritiva evidenciou a presença de *outliers* severos nas variáveis monetárias — por exemplo, `AMT_INCOME_TOTAL` possui mediana de $\$147.150$, porém valor máximo de $\$117.000.000$ (*skewness* $= 391,56$), enquanto `BUREAU_TOTAL_CREDIT_SUM` apresenta *skewness* de $78,34$.
-
-* **Decisão Metodológica:** Vetou-se o uso de imputação pela média aritmética. Todo o pipeline numérico adota **imputação pela mediana (`SimpleImputer(strategy='median')`)**, assegurando robustez frente a valores extremos.
-
-### 4.3. Poder Discriminante Contínuo e Categórico
-
-A análise bivariada evidenciou contrastes marcantes no perfil dos clientes inadimplentes (`TARGET = 1`):
-
-* Redução expressiva nos scores de birôs externos: a mediana de `EXT_SOURCE_3` sofre redução de $-29,0\%$ ($0,379$ vs. $0,535$) e a de `EXT_SOURCE_2` de $-22,1\%$ ($0,440$ vs. $0,565$).
-* Menor maturidade profissional e etária: mediana de tempo de emprego $-27,5\%$ inferior ($3,38$ anos vs. $4,66$ anos) e idade mediana mais baixa ($39,1$ anos vs. $43,8$ anos).
-* O dobro de operações ativas no mercado: a mediana de `BUREAU_ACTIVE_LOANS` aumenta em $+100\%$ ($2,0$ vs. $1,0$).
-* Gradiente relevante de risco demográfico e socioeconômico nas variáveis categóricas (`NAME_EDUCATION_TYPE`, `NAME_INCOME_TYPE` e `CODE_GENDER`).
-
-### 4.4. Estratégia de MVP e Mapeamento nos 5 Cs do Crédito (12 Features)
-
-Em sistemas produtivos de concessão de crédito, pipelines com excesso de variáveis elevam a latência de rede, fragilizam o contrato do *payload* da API e dificultam auditorias regulatórias.
-
-Optou-se pela estratégia de **MVP (*Minimum Viable Product*)**: após a eliminação de variáveis redundantes via Matriz de Correlação de Pearson (como `AMT_GOODS_PRICE`, que apresentava $r = 0,99$ com `AMT_CREDIT`, e `BUREAU_TOTAL_LOANS`, com $r = 0,74$ frente a `BUREAU_ACTIVE_LOANS`), selecionaram-se **12 atributos de elevado poder discriminante**, estruturados segundo os pilares clássicos dos **5 Cs do Crédito**:
-
-| Pilar dos 5 Cs do Crédito | Significado Bancário | Variáveis Selecionadas no Contrato do MVP |
-| :--- | :--- | :--- |
-| **1. Caráter (*Character*)** | Histórico de cumprimento de obrigações e reputação de mercado. | `EXT_SOURCE_2`, `EXT_SOURCE_3` |
-| **2. Capacidade (*Capacity*)** | Geração de renda, estabilidade profissional e comprometimento financeiro. | `AMT_INCOME_TOTAL`, `ANNUITY_TO_INCOME_RATIO`, `YEARS_EMPLOYED` |
-| **3. Capital (*Capital*)** | Grau de endividamento vigente no mercado e alavancagem financeira. | `BUREAU_ACTIVE_LOANS`, `BUREAU_TOTAL_DEBT_SUM` |
-| **4. Condições (*Conditions*)** | Condições da operação e enquadramento socioeconômico/demográfico do tomador. | `AMT_CREDIT`, `NAME_CONTRACT_TYPE`, `AGE_YEARS`, `CODE_GENDER`, `NAME_EDUCATION_TYPE` |
-| **5. Colateral (*Collateral*)** | Garantias atreladas ao financiamento *(capturado indiretamente pelo valor e modalidade contratada)*. | *(Representado via `AMT_CREDIT` e modalidade `NAME_CONTRACT_TYPE`)* |
+* `BUREAU_TOTAL_LOANS` e `BUREAU_ACTIVE_LOANS`: Total de contratos registrados no birô e quantidade de contratos vigentes (`Active`).
+* `BUREAU_TOTAL_CREDIT_SUM` e `BUREAU_TOTAL_CREDIT_DEBT`: Somatório dos valores contratados e do saldo devedor atual no mercado.
+* `DTI_RATIO` (*Debt-to-Income*): Razão entre o valor da anuidade/parcela e a renda declarada ($\frac{\text{AMT\_ANNUITY}}{\text{AMT\_INCOME\_TOTAL}}$).
+* `CREDIT_INCOME_RATIO`: Razão entre o montante total solicitado e a renda anual ($\frac{\text{AMT\_CREDIT}}{\text{AMT\_INCOME\_TOTAL}}$).
 
 ---
 
-## 🤖 5. Modelagem Científica, Prevenção de Data Leakage e Seleção do Campeão
+## 📊 4. Análise Exploratória (EDA) e Seleção de Variáveis (5 Cs do Crédito)
 
-### 5.1. Arquitetura Anti-Leakage
+O estudo exploratório conduzido em `notebooks/EDA_modeling_pipeline.ipynb` orientou as escolhas de pré-processamento e a redução de dimensionalidade para o serviço de inferência.
 
-A base de dados foi particionada de maneira estratificada em **Treino ($80\%$ — $246.008$ registros)** e **Teste Holdout ($20\%$ — $61.503$ registros)**. Todo o pré-processamento (`SimpleImputer`, `StandardScaler` e `OneHotEncoder(handle_unknown='ignore')`) foi encapsulado em um objeto unificado `Pipeline` + `ColumnTransformer` do Scikit-Learn, garantindo que estatísticas de imputação e escalonamento fossem ajustadas (`.fit()`) exclusivamente nos dados de treino.
+### 4.1. Proporção da Variável Alvo (`TARGET`)
 
-### 5.2. Torneio de Modelos (5-Fold Stratified Cross-Validation)
+A base apresenta uma taxa histórica de inadimplência (*Bad Rate*) de $8,07\%$ ($24.825$ contratos inadimplentes) frente a $91,93\%$ de contratos adimplentes ($282.686$), resultando em uma proporção de $11,39 : 1$.
 
-Três famílias de algoritmos com níveis crescentes de complexidade foram avaliadas na base de Treino:
+* **Abordagem adotada:** Como a acurácia simples é pouco informativa em cenários desbalanceados, utilizou-se divisão estratificada (`stratify=y`), ponderação de classes nos algoritmos e avaliação baseada na capacidade de ordenação de risco (**ROC-AUC**, **PR-AUC** e **Estatística KS**).
 
-| Modelo Candidato | ROC-AUC (CV Mean $\pm$ Std) | PR-AUC (CV Mean) | Brier Score | Tempo de Fit |
-| :--- | :---: | :---: | :---: | :---: |
-| **1. Logistic Regression** *(Baseline Linear)* | $0,7263 \pm 0,0047$ | $0,2047$ | $0,2076$ | $0,68\text{ s}$ |
-| **2. Random Forest** *(Bagging Paralelo)* | $0,7331 \pm 0,0044$ | $0,2111$ | $0,1924$ | $14,72\text{ s}$ |
-| **3. CatBoost Classifier** *(Gradient Boosting)* | $0,7379 \pm 0,0048$ | $0,2174$ | $0,2037$ | $8,84\text{ s}$ |
+### 4.2. Distribuições Assimétricas e Tratamento de Nulos
 
-O **CatBoost Classifier** (`iterations=400`, `depth=4`, `learning_rate=0.05`, `l2_leaf_reg=5.0`) alcançou desempenho superior em todas as métricas de discriminação de risco, capturando interações não-lineares entre os 5 Cs do Crédito com estabilidade entre os *folds* e reduzido *gap* de generalização entre treino e validação ($0,0048$).
+Variáveis monetárias como `AMT_INCOME_TOTAL` (mediana de $147.150$ e máximo de $117.000.000$) e `BUREAU_TOTAL_CREDIT_DEBT` apresentam forte assimetria à direita. Paralelamente, variáveis relevantes possuem ausências legítimas de negócio, como `EXT_SOURCE_3` ($19,83\%$ de nulos para clientes sem score naquele birô) e `YEARS_EMPLOYED` ($18,01\%$ de nulos).
 
----
+* **Abordagem adotada:** Para reduzir a sensibilidade a valores extremos, optou-se pela **imputação numérica via mediana (`SimpleImputer(strategy='median')`)** acoplada ao escalonamento padronizado (`StandardScaler`) dentro do pipeline de validação.
 
-## 🎯 6. Avaliação no Holdout, Política de Crédito e Rigor Estatístico
+### 4.3. Comportamento Bivariado Observado na Amostra
 
-No conjunto de Teste isolado ($61.503$ propostas não observadas no treino), o pipeline campeão obteve os seguintes resultados:
+Na comparação entre os grupos adimplente (`TARGET = 0`) e inadimplente (`TARGET = 1`), destacam-se as seguintes tendências medianas:
 
-* **ROC-AUC:** **`0.7353`**
-* **PR-AUC (Average Precision):** **`0.2116`** ($2,62\times$ superior à taxa aleatória de $0,0807$)
-* **Estatística KS (Kolmogorov-Smirnov):** **`0.3510`** ($35,10\%$ de separação máxima acumulada entre adimplentes e inadimplentes, patamar classificado como excelente no varejo financeiro).
+* Pontuações externas menores entre inadimplentes: mediana de `EXT_SOURCE_3` $30,57\%$ menor ($0,3791$ vs. $0,5460$) e de `EXT_SOURCE_2` $23,27\%$ menor ($0,4404$ vs. $0,5739$).
+* Menor tempo médio de vínculo empregatício (`YEARS_EMPLOYED` com mediana de $3,37$ anos vs. $4,63$ anos) e faixa etária ligeiramente mais jovem ($39,1$ anos vs. $43,5$ anos).
+* Maior alavancagem simultânea no birô: mediana de $2,0$ empréstimos ativos (`BUREAU_ACTIVE_LOANS`) e saldo devedor mediano $59,15\%$ superior ($133.812$ vs. $84.078$).
 
-### 6.1. Política Operacional de Crédito: Semáforo de 3 Faixas
+### 4.4. Contrato de Entrada do MVP (12 Variáveis e os 5 Cs do Crédito)
 
-Dado que o treinamento operou com balanceamento de classes (`Balanced`), as probabilidades calculadas funcionam como um **Score Ordinal de Risco** calibrado em torno de $0,50$. Em substituição a uma regra puramente binária, adotaram-se os dois limiares ótimos calculados sobre a curva de teste — o ponto de **Máximo KS / $F_2$-Score (`0.5027`)** e o de **Máximo $F_1$-Score (`0.6400`)** — para estruturar uma política de concessão em 3 faixas:
+Visando manter a interface da API enxuta e reduzir redundâncias (como a alta colinearidade entre `AMT_GOODS_PRICE` e `AMT_CREDIT`, e entre `BUREAU_TOTAL_LOANS` e `BUREAU_ACTIVE_LOANS`), foram selecionadas **12 variáveis** distribuídas conforme os **5 Cs do Crédito**:
 
-| Faixa de Score (`prob`) | Classificação de Risco | Ação Recomendada na API | Racional de Negócio e Impacto na Carteira |
-| :---: | :---: | :---: | :--- |
-| **`< 0.5027`** | 🟢 **BAIXO RISCO** | **Aprovação Automática** (*Fast-Track*) | Preserva $71,0\%$ dos clientes adimplentes e reduz a taxa de inadimplência da carteira aprovada de $8,07\%$ **para $4,19\%$** ($-48,1\%$ **de redução relativa de perdas**). |
-| **`0.5027` a `0.6399`** | 🟡 **MÉDIO RISCO** | **Análise Manual / Limite Reduzido** (*Zona Cinzenta*) | Casos limítrofes passíveis de solicitação de garantias, documentação complementar ou redução de limite concedido. |
-| **`>= 0.6400`** | 🔴 **ALTO RISCO** | **Reprovação Automática** (*Política Restritiva*) | Bloqueio do estrato superior de risco onde a concentração de inadimplência é crítica, prevenindo baixas a prejuízo (*write-offs*). |
-
-### 6.2. Comprovação de Significância Estatística (Bootstrap e Teste Z)
-
-Para mitigar o risco de conclusões atreladas a variações amostrais, executaram-se dois procedimentos de validação formal sobre o conjunto de Teste:
-
-1. **Pareamento via Bootstrap ($500$ réplicas):** A superioridade do CatBoost (`0.7353`, IC 95%: `[0.7285, 0.7423]`) sobre a Regressão Logística (`0.7244`, IC 95%: `[0.7172, 0.7316]`) resultou em ganho médio de $\Delta\text{AUC} = +0,0109$ com $p\text{-value} < 0,0001$ (superior em $100\%$ das reamostragens).
-2. **Teste A/B de Impacto de Carteira (Teste Z de Proporções):** A contração da taxa de inadimplência de $8,07\%$ para $4,19\%$ registrou estatística $Z = -21,34$ ($p\text{-value} < 0,0001$), evidenciando significância estatística na contenção de perdas financeiras.
-
-### 6.3. Explicabilidade e Conformidade Regulatória (BACEN / LGPD)
-
-A análise de importância de atributos corrobora a aderência do modelo aos **5 Cs do Crédito**: o pilar de **Caráter** (`EXT_SOURCE_2` e `EXT_SOURCE_3`) concentra $62,0\%$ da influência decisória, complementado pelas **Condições e Capacidade** do proponente (`AMT_CREDIT` com $9,3\%$, `AGE_YEARS` com $6,7\%$, escolaridade com $5,5\%$ e tempo de emprego `YEARS_EMPLOYED` com $4,7\%$).
+| Variável no Contrato | Nome de Negócio | Pilar dos 5 Cs | Descrição Resumida |
+| :--- | :--- | :--- | :--- |
+| `EXT_SOURCE_2` | Score Externo 2 | Capital / Condições | Pontuação normalizada de birô externo ($0,0$ a $1,0$). |
+| `EXT_SOURCE_3` | Score Externo 3 | Capital / Condições | Segunda pontuação de birô externo ($0,0$ a $1,0$, aceita nulo). |
+| `AMT_CREDIT` | Valor do Crédito | Capacidade | Montante total solicitado na proposta. |
+| `AMT_INCOME_TOTAL` | Renda Total Anual | Capacidade | Renda anual bruta declarada pelo proponente. |
+| `DTI_RATIO` | Comprometimento de Renda (DTI) | Capacidade | Proporção da renda comprometida com a parcela (aceita nulo). |
+| `AGE_YEARS` | Idade | Caráter | Idade do proponente em anos na data da análise. |
+| `YEARS_EMPLOYED` | Tempo de Emprego | Caráter | Anos no vínculo atual (aceita nulo para aposentados/sem vínculo). |
+| `NAME_EDUCATION_TYPE` | Escolaridade | Caráter | Nível de escolaridade informado (5 categorias). |
+| `NAME_INCOME_TYPE` | Tipo de Vínculo / Renda | Caráter / Capacidade | Natureza da fonte de renda (8 categorias). |
+| `BUREAU_ACTIVE_LOANS` | Empréstimos Ativos no Birô | Condições / Histórico | Quantidade de contratos ativos em outras instituições. |
+| `BUREAU_TOTAL_CREDIT_DEBT` | Dívida Total Ativa no Birô | Capital | Soma do saldo devedor em aberto no mercado. |
+| `FLAG_OWN_CAR` | Possui Veículo Próprio | Colateral | Indicativo binário de posse de veículo ($1 = \text{Sim}$, $0 = \text{Não}$). |
 
 ---
 
-## 📂 7. Estrutura Atual do Repositório
+## 🤖 5. Modelagem e Avaliação Estatística
+
+### 5.1. Estrutura de Pré-Processamento e Validação
+
+Os dados foram divididos de forma estratificada em conjuntos de treino, validação e teste (*holdout*). As transformações de imputação e codificação categórica (`OneHotEncoder(handle_unknown='ignore')`) foram encapsuladas em um `Pipeline` único do Scikit-Learn para que os parâmetros fossem estimados apenas sobre o conjunto de treinamento.
+
+Foram comparados diferentes algoritmos lineares e baseados em árvores (como *Logistic Regression*, *Random Forest*, *HistGradientBoosting* e *CatBoost*), utilizando validação cruzada estratificada. O **CatBoost Classifier** apresentou o conjunto mais equilibrado de resultados nas métricas de ordenação de risco e generalização, sendo escolhido para compor o artefato final (`models/credit_risk_pipeline.joblib`).
+
+### 5.2. Desempenho no Conjunto de Teste e Faixas Operacionais
+
+Na partição de teste isolada, o modelo selecionado registrou:
+
+* **ROC-AUC:** $\approx 0,735$ (com intervalo de confiança via *bootstrap* documentado em `models/model_metrics.json`).
+* **Estatística KS:** $\approx 35,1\%$ de separação máxima entre as distribuições acumuladas de bons e maus pagadores.
+
+Para apoiar a operação bancária de forma mais flexível do que uma decisão binária simples, os scores probabilísticos foram divididos em três faixas operacionais (*Semáforo de Risco*), calibradas a partir das curvas de validação:
+
+| Faixa de Score (`prob`) | Classificação Operacional | Recomendação de Negócio |
+| :---: | :--- | :--- |
+| **`< 0.5027`** | 🟢 **APROVADO AUTOMÁTICO** | Proposta dentro do apetite de risco para aprovação no fluxo automatizado. |
+| **`0.5027` a `0.6399`** | 🟡 **ANÁLISE ADICIONAL / CONDICIONAL** | Faixa intermediária (*zona cinzenta*); sugere avaliação manual, comprovação adicional ou ajuste de valor/garantia. |
+| **`>= 0.6400`** | 🔴 **REPROVADO AUTOMÁTICO** | Concentração elevada de risco de inadimplência; recomenda-se a recusa nas condições solicitadas. |
+
+Na análise de importância das variáveis do modelo (`feature_importance_contract_pct`), observa-se que os indicadores externos de mercado (`EXT_SOURCE_2` e `EXT_SOURCE_3`) concentram a maior parcela de contribuição preditiva, atuando em conjunto com os indicadores de alavancagem (`AMT_CREDIT`, `DTI_RATIO`, `BUREAU_TOTAL_CREDIT_DEBT`) e estabilidade (`AGE_YEARS`, `YEARS_EMPLOYED`).
+
+---
+
+## 📂 6. Estrutura do Repositório
 
 ```text
-├── data/                           # Data Lakehouse local [Ignorado no Git]
-│   ├── bronze/                     # Camada Bronze: CSVs originais (application_train.csv, bureau.csv)
-│   ├── silver/                     # Camada Silver: application_train.parquet, bureau.parquet
-│   └── gold/                       # Camada Gold: abt_credit_risk.parquet (ABT)
+├── data/                           # Diretório local de dados [Ignorado no Git]
+│   ├── bronze/                     # Arquivos CSV brutos (application_train.csv, bureau.csv)
+│   ├── silver/                     # Tabelas tratadas (application_train.parquet, bureau.parquet)
+│   └── gold/                       # Tabela Analítica Final (abt_credit_risk.parquet)
 ├── models/
-│   ├── credit_risk_pipeline.joblib # Pipeline completo serializado (Pré-processamento + CatBoost - 120 KB)
-│   └── model_metrics.json          # Metadados de auditoria, métricas de teste e limiares (0.5027 / 0.6400)
+│   ├── credit_risk_pipeline.joblib # Pipeline serializado (Pré-processamento + CatBoost)
+│   └── model_metrics.json          # Métricas de avaliação, hiperparâmetros e limiares de corte
 ├── notebooks/
-│   ├── ELT.ipynb                   # Engenharia de Dados PySpark / Arquitetura Medalhão (Bronze -> Silver -> Gold ABT)
-│   └── EDA_modeling_pipeline.ipynb # EDA, Seleção de Features, Pipeline Scikit-Learn + CatBoost e Métricas Oficiais
-├── outputs/                        # Gráficos de alta resolução gerados na Fase 2/3 (300 DPI)
-├── app/                            # Microsserviço FastAPI (inferência)
-│   ├── main.py                     # Endpoints: /health, /metadata, /predict, /predict/batch
-│   ├── schemas.py                  # Contratos Pydantic (payload unitário, lote e respostas)
-│   └── model.py                    # Carregamento do pipeline e lógica de predição/faixas de risco
-├── frontend/                       # Front-End corporativo (Streamlit — Mesa de Crédito)
-│   ├── app.py                      # Interface, Motor de Decisão em Dupla Camada e Hard Rules
-│   ├── Dockerfile                  # Imagem do front-end (python:3.11-slim, porta 8501)
+│   ├── ELT.ipynb                   # Pipeline PySpark (Bronze -> Silver -> Gold ABT)
+│   └── EDA_modeling_pipeline.ipynb # EDA, seleção de variáveis, treinamento e avaliação
+├── outputs/                        # Gráficos gerados durante a análise e avaliação do modelo
+├── app/                            # Serviço REST em FastAPI
+│   ├── main.py                     # Rotas da API (/health, /metadata, /predict, /predict/batch)
+│   ├── schemas.py                  # Contratos de entrada e saída em Pydantic V2
+│   └── model.py                    # Serviço de carregamento do modelo e inferência vetorizada
+├── frontend/                       # Interface em Streamlit (Mesa de Crédito)
+│   ├── app.py                      # Aplicação visual, tradução PT-BR e regras de política
+│   ├── Dockerfile                  # Imagem Docker do front-end (porta 8501)
 │   ├── requirements.txt            # Dependências do front-end
 │   └── .streamlit/
-│       └── config.toml             # Tema institucional (cores e layout)
+│       └── config.toml             # Configuração de tema visual
 ├── tests/
-│   └── test_api.py                 # Suíte Pytest da API
-├── Dockerfile                      # Imagem da API (porta 8000)
-├── docker-compose.yml              # Orquestração da stack completa (API + Front-End)
-├── requirements.txt                # Dependências do projeto
-└── README.md                       # Documentação técnica e executiva (CRISP-DM)
+│   └── test_api.py                 # Testes automatizados da API com Pytest
+├── Dockerfile                      # Imagem Docker da API (porta 8000)
+├── docker-compose.yml              # Orquestração local dos contêineres (API + Front-End)
+├── requirements.txt                # Dependências da API e modelagem
+└── README.md                       # Documentação geral do projeto
 ```
 
 ---
 
-## 🔌 8. API REST (FastAPI)
+## 🔌 7. Serviço de Inferência (API FastAPI)
 
-A API (`app/main.py`) carrega o pipeline serializado na inicialização e valida os *payloads* com **Pydantic** (`extra="forbid"`). Documentação interativa (Swagger UI) em `http://localhost:8000/docs`.
+O serviço de back-end (`app/`) carrega o artefato `.joblib` e os metadados durante o ciclo de inicialização (`lifespan`) e valida os dados recebidos com **Pydantic V2** (`extra="forbid"`, restrições de domínio e aceitação de valores `null` nas variáveis opcionais).
 
-| Método | Endpoint | Descrição |
+| Método | Endpoint | Função |
 | :---: | :--- | :--- |
-| `GET` | `/health` | *Health check* e status de carga do modelo. |
-| `GET` | `/metadata` | Métricas e limiares do modelo (`model_metrics.json`). Retorna `503` se o modelo não estiver carregado. |
-| `POST` | `/predict` | Predição individual de uma proposta de crédito. |
-| `POST` | `/predict/batch` | Predição **vetorizada** de múltiplas propostas em uma única chamada. |
+| `GET` | `/health` | Verifica a disponibilidade do serviço e se o modelo está carregado em memória. |
+| `GET` | `/metadata` | Retorna as métricas oficiais, hiperparâmetros e limiares registrados em `model_metrics.json`. |
+| `POST` | `/predict` | Realiza a inferência para uma proposta individual. |
+| `POST` | `/predict/batch` | Realiza a inferência vetorizada para uma lista de propostas em uma única chamada. |
 
-### 8.1. `POST /predict`
-
-Recebe as 12 variáveis do MVP e retorna `probabilidade_default`, `decisao_binaria`, `faixa_risco` (`APROVADO_AUTOMATICO`, `ANALISE_ADICIONAL_OU_CONDICIONAL` ou `REPROVADO_AUTOMATICO`) e `threshold_utilizado`.
-
-### 8.2. `POST /predict/batch`
-
-Endpoint vetorizado para processamento em lote: o corpo contém a lista `applications` (mínimo de 1 item), cada qual com o mesmo contrato de `/predict`. O pipeline é executado sobre todo o lote de uma só vez, evitando o custo de uma requisição HTTP por proposta.
-
-**Requisição:**
+**Exemplo de Payload (`POST /predict`):**
 ```json
 {
-  "applications": [
-    {
-      "EXT_SOURCE_2": 0.55,
-      "EXT_SOURCE_3": 0.50,
-      "AMT_CREDIT": 450000.0,
-      "YEARS_EMPLOYED": 6.5,
-      "AGE_YEARS": 38.0,
-      "DTI_RATIO": 0.28,
-      "AMT_INCOME_TOTAL": 180000.0,
-      "BUREAU_TOTAL_CREDIT_DEBT": 35000.0,
-      "BUREAU_ACTIVE_LOANS": 2,
-      "FLAG_OWN_CAR": 1,
-      "NAME_EDUCATION_TYPE": "Higher education",
-      "NAME_INCOME_TYPE": "Working"
-    }
-  ]
+  "EXT_SOURCE_2": 0.55,
+  "EXT_SOURCE_3": 0.50,
+  "AMT_CREDIT": 450000.0,
+  "YEARS_EMPLOYED": 6.5,
+  "AGE_YEARS": 38.0,
+  "DTI_RATIO": 0.28,
+  "AMT_INCOME_TOTAL": 180000.0,
+  "BUREAU_TOTAL_CREDIT_DEBT": 35000.0,
+  "BUREAU_ACTIVE_LOANS": 2,
+  "FLAG_OWN_CAR": 1,
+  "NAME_EDUCATION_TYPE": "Higher education",
+  "NAME_INCOME_TYPE": "Working"
 }
 ```
 
-**Resposta:** `predictions` (lista de objetos idênticos à resposta de `/predict`, na mesma ordem da entrada) e `summary`, com `total_processado` e `contagem_por_faixa` (quantidade de propostas por faixa de risco).
-
 ---
 
-## 🖥️ 9. Front-End Corporativo (Streamlit — Mesa de Crédito) e Motor de Decisão em Dupla Camada
+## 🖥️ 8. Interface Visual (Streamlit) e Decisão em Dupla Camada
 
-O diretório `frontend/` contém a **Mesa de Crédito**, aplicação **Streamlit** que consome a API via HTTP (variável de ambiente `API_URL`; `http://api:8000` na rede do Docker Compose) e oferece:
+A aplicação **Mesa de Crédito** (`frontend/app.py`) oferece uma interface em português voltada a analistas de crédito, dividida em três abas:
 
-* **Simulação individual** de propostas (consumindo `/predict`), com *presets* de exemplo e *cards* de decisão por faixa de risco.
-* **Análise em lote** via upload de CSV (consumindo `/predict/batch`), com tabela de resultados contendo o **Status do Modelo** e as **Travas de Política** acionadas.
-* **Dicionário de dados** e indicadores de saúde/metadados do modelo obtidos da API.
-* Tema institucional definido em `frontend/.streamlit/config.toml`.
+1. **Análise de Proposta Individual:** Formulário organizado pelos 5 Cs do Crédito, com botões de simulação rápida (*presets* de baixo, médio e alto risco) e tradução interna dos domínios categóricos para o formato esperado pela API.
+2. **Análise de Lotes (Batch via CSV):** Permite baixar uma planilha modelo, enviar múltiplas propostas simultaneamente para o endpoint `/predict/batch` e exportar o relatório avaliado.
+3. **Dicionário de Dados & Política de Risco:** Consulta às descrições das 12 variáveis, faixas do semáforo e metadados técnicos do modelo.
 
-### 9.1. Motor de Decisão em Dupla Camada
+### Regras de Política Institucional (*Hard Rules*)
 
-A decisão final combina duas camadas independentes e auditáveis:
+Em operações reais de crédito, modelos estatísticos atuam em conjunto com travas de política institucional, pois um *score* histórico favorável de birô pode não refletir uma restrição imediata de capacidade de pagamento. Na interface, implementou-se uma segunda camada de verificação sobre o retorno do modelo:
 
-1. **Camada 1 — Score Estatístico (CatBoost):** a API calcula a probabilidade de inadimplência e a classifica no semáforo de 3 faixas (limiares `0.5027` / `0.6400`).
-2. **Camada 2 — Travas de Política Institucional (*Hard Rules*):** o front-end aplica limites prudenciais determinísticos sobre o resultado do modelo.
-
-| Hard Rule | Condição | Efeito |
+| Regra de Política | Condição Verificada | Efeito na Decisão Final |
 | :--- | :--- | :--- |
-| **Desemprego** | `NAME_INCOME_TYPE = Unemployed` (Desempregado) | 🔴 Reprovação automática |
-| **Alavancagem** | `AMT_CREDIT > 10 × AMT_INCOME_TOTAL` | 🔴 Reprovação automática |
-| **DTI Mensal crítico** | `DTI_RATIO > 50%` | 🔴 Reprovação automática |
-| **DTI Mensal em alerta** | `35% < DTI_RATIO ≤ 50%` e modelo = Aprovado | 🟡 Rebaixado para análise adicional/condicional |
+| **Ausência de Renda Ativa** | `NAME_INCOME_TYPE == "Unemployed"` (Desempregado) | 🔴 Reclassifica para **Reprovado Automático** |
+| **Alavancagem Elevada** | `AMT_CREDIT > 10 × AMT_INCOME_TOTAL` | 🔴 Reclassifica para **Reprovado Automático** |
+| **DTI Mensal Crítico** | `DTI_RATIO > 50%` | 🔴 Reclassifica para **Reprovado Automático** |
+| **DTI Mensal em Atenção** | `35% < DTI_RATIO ≤ 50%` (quando o modelo indica aprovação) | 🟡 Encaminha para **Análise Adicional / Condicional** |
 
-> [!IMPORTANT]
-> A política **só pode agravar** a decisão do modelo: nunca converte uma reprovação em aprovação. Quando uma trava prevalece sobre o score, a interface exibe o aviso de **Travas de Política Acionadas** com os motivos, preservando a rastreabilidade entre o score puro e a decisão institucional.
+As regras de política atuam de forma conservadora (podem tornar a decisão mais cautelosa, mas não convertem uma reprovação estatística em aprovação). Quando uma trava é acionada, o painel exibe tanto o **Score Estatístico Puro do Modelo** quanto o motivo da sobreposição pela política institucional.
 
 ---
 
-## 🚀 10. Instruções para Reprodução Local
+## 🚀 9. Instruções para Execução Local
 
-1. **Clonagem do repositório e criação do ambiente virtual:**
-   ```bash
-   git clone <URL_DO_SEU_REPOSITORIO>
-   cd <NOME_DO_REPOSITORIO>
-   python -m venv .venv
-   source .venv/bin/activate  # Linux/macOS (ou .venv\Scripts\activate no Windows)
-   pip install -r requirements.txt
-   ```
+### Opção A: Subir a Stack Completa via Docker Compose (Recomendado)
 
-2. **Execução do Pipeline de Engenharia de Dados (Camada Gold):**
-   Com os arquivos `application_train.csv` e `bureau.csv` posicionados em `data/bronze/`, executar o notebook `notebooks/ELT.ipynb` (Bronze -> Silver -> Gold).
+Com o Docker e o Docker Compose instalados, execute na raiz do repositório:
 
-3. **Inspeção do Treinamento e Testes Estatísticos:**
-   Abrir o notebook `notebooks/EDA_modeling_pipeline.ipynb` para verificação das tabelas descritivas, gráficos diagnósticos e exportação dos artefatos em `models/`.
+```bash
+docker compose up --build
+```
 
-4. **Execução da Stack Completa (API + Front-End) com um único comando:**
-   Com o Docker e o Docker Compose instalados, na raiz do repositório execute:
-   ```bash
-   docker compose up --build
-   ```
-   O serviço do front-end só inicia após o *healthcheck* da API ser aprovado. Após a subida, acesse:
+O contêiner do front-end aguarda a confirmação de saúde (`healthcheck`) da API antes de iniciar. Após a inicialização, acesse no navegador:
 
-   | Serviço | URL |
-   | :--- | :--- |
-   | 🖥️ Front-End (Mesa de Crédito — Streamlit) | http://localhost:8501 |
-   | 🔌 API FastAPI (Swagger UI) | http://localhost:8000/docs |
+* **Front-End (Streamlit):** `http://localhost:8501`
+* **API (Swagger UI):** `http://localhost:8000/docs`
 
-   Para encerrar e remover os contêineres: `docker compose down`.
+Para encerrar os serviços: `docker compose down`.
+
+### Opção B: Execução em Ambiente Virtual Python (Testes e Notebooks)
+
+```bash
+# 1. Clonar o repositório e ativar o ambiente virtual
+git clone [https://github.com/JeanKahlilR/Home-Credit-Default-Risk.git](https://github.com/JeanKahlilR/Home-Credit-Default-Risk.git)
+cd Home-Credit-Default-Risk
+python -m venv .venv
+source .venv/bin/activate
+
+# 2. Instalar as dependências e executar a suíte de testes da API
+pip install -r requirements.txt
+pytest -v
+```
