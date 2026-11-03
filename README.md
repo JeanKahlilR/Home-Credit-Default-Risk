@@ -20,23 +20,23 @@ Neste projeto, utilizou-se a base histórica da *Home Credit* ($307.511$ solicit
 
 O ciclo de vida do projeto foi estruturado conforme as etapas clássicas do **CRISP-DM**, conectando o entendimento de negócio ao *deploy* produtivo:
 
-- [x] **Fase 1 — *Business & Data Understanding / Data Preparation* (Arquitetura Medallion):** Compreensão das regras de concessão, ingestão de dados relacionais brutos (*Raw/Bronze*), agregação SQL em memória via **DuckDB** (*Silver*) e construção de *features* de domínio financeiro em formato colunar `.parquet` (*Gold*).
+- [x] **Fase 1 — *Business & Data Understanding / Data Preparation* (Arquitetura Medallion):** Compreensão das regras de concessão, ingestão de dados relacionais brutos (*Raw/Bronze*), agregação e transformação distribuída via **PySpark** (*Silver*) e construção de *features* de domínio financeiro em formato colunar `.parquet` (*Gold*).
 - [x] **Fase 2 — *Exploratory Data Analysis & Feature Selection* (MVP & 5 Cs do Crédito):** Análise exploratória orientada a hipóteses, diagnóstico de assimetria e desbalanceamento, poda de multicolinearidade e definição do contrato enxuto do MVP ancorado nos **5 Cs do Crédito**.
 - [x] **Fase 3 — *Modeling & Statistical Evaluation* (Torneio de Modelos & Política de Crédito):** Prevenção de vazamento de dados via `Pipeline` + `ColumnTransformer`, competição de algoritmos com validação cruzada estratificada, calibração de limiares de negócio ($F_1$, $F_2$ e KS) e validação de significância estatística (*Bootstrap* e Teste Z).
-- [ ] **Fase 4 — *Deployment: Microsserviço REST & Containerização*:** Exposição do pipeline serializado em API REST (**FastAPI**), contratos estritos de validação de payload (**Pydantic**), suíte de testes automatizados (**Pytest**) e empacotamento reprodutível em **Docker**.
-- [ ] **Fase 5 — *Business Simulation & Executive Pitch*:** Interface executiva interativa em **Streamlit** consumindo a API para simulação individual de propostas (Motor de Decisão) e avaliação financeira da carteira.
+- [x] **Fase 4 — *Deployment: Microsserviço REST & Containerização*:** Exposição do pipeline serializado em API REST (**FastAPI**), contratos estritos de validação de payload (**Pydantic**), suíte de testes automatizados (**Pytest**) e empacotamento reprodutível em **Docker**.
+- [x] **Fase 5 — *Business Simulation & Executive Pitch*:** Interface executiva interativa em **Streamlit** consumindo a API para simulação individual de propostas (Motor de Decisão) e avaliação financeira da carteira.
 
 ---
 
 ## 🏗️ 3. Engenharia de Dados e Arquitetura Medallion (*Data Preparation*)
 
-Para o processamento de mais de $307\text{ mil}$ contratos principais (`application_train.csv`) cruzados com mais de $1,7\text{ milhão}$ de registros históricos de outras instituições financeiras (`bureau.csv`), implementou-se um pipeline analítico de alta performance utilizando **DuckDB** e armazenamento **Apache Parquet**.
+Para o processamento de mais de $307\text{ mil}$ contratos principais (`application_train.csv`) cruzados com mais de $1,7\text{ milhão}$ de registros históricos de outras instituições financeiras (`bureau.csv`), implementou-se um pipeline analítico de alta performance utilizando **PySpark** e armazenamento **Apache Parquet**.
 
 ### Estrutura das Camadas de Dados
 
-* **Camada Bronze (`data/raw/`):** Dados brutos originais em CSV, preservados de forma imutável.
-* **Camada Silver (`sql/create_abt.sql`):** Processamento relacional *in-memory* via DuckDB executando `LEFT JOIN` entre a proposta atual e as agregações históricas do birô por cliente (`SK_ID_CURR`), assegurando **cardinalidade estrita** $1:1$ (ausência de duplicação de linhas).
-* **Camada Gold (`data/processed/abt_train.parquet`):** Tabela Analítica Final (*ABT*) devidamente tipada, saneada de anomalias cadastrais (ex.: conversão do marcador `365243` em `DAYS_EMPLOYED` para `NULL`) e enriquecida com variáveis de negócio, comprimida de centenas de megabytes para $\approx 13\text{ MB}$.
+* **Camada Bronze (`data/bronze/`):** Dados brutos originais em CSV, preservados de forma imutável.
+* **Camada Silver (`data/silver/`):** Processamento no notebook `notebooks/ELT.ipynb` via PySpark executando `LEFT JOIN` entre a proposta atual e as agregações históricas do birô por cliente (`SK_ID_CURR`), assegurando **cardinalidade estrita** $1:1$ (ausência de duplicação de linhas).
+* **Camada Gold (`data/gold/abt_credit_risk.parquet`):** Tabela Analítica Final (*ABT*) devidamente tipada, saneada de anomalias cadastrais (ex.: conversão do marcador `365243` em `DAYS_EMPLOYED` para `NULL`) e enriquecida com variáveis de negócio, comprimida de centenas de megabytes para $\approx 13\text{ MB}$.
 
 ### Engenharia de Atributos (*Feature Engineering*) de Domínio Bancário
 
@@ -52,7 +52,7 @@ Além das variáveis originais de cadastro e birô, foram derivadas razões fina
 
 ## 📊 4. Análise Exploratória (EDA) e Design do MVP pelos 5 Cs do Crédito
 
-Toda a arquitetura de pré-processamento e seleção de variáveis do modelo foi orientada por evidências estatísticas obtidas na etapa de EDA (`notebooks/02_model_training_and_evaluation.ipynb`).
+Toda a arquitetura de pré-processamento e seleção de variáveis do modelo foi orientada por evidências estatísticas obtidas na etapa de EDA (`notebooks/EDA_modeling_pipeline.ipynb`).
 
 ### 4.1. Desbalanceamento Severo da Classe Alvo (`TARGET`)
 
@@ -145,27 +145,111 @@ A análise de importância de atributos corrobora a aderência do modelo aos **5
 ## 📂 7. Estrutura Atual do Repositório
 
 ```text
-├── data/
-│   ├── raw/                        # Camada Bronze: CSVs originais (Home Credit) [Ignorado no Git]
-│   └── processed/                  # Camada Gold: abt_train.parquet [Ignorado no Git]
+├── data/                           # Data Lakehouse local [Ignorado no Git]
+│   ├── bronze/                     # Camada Bronze: CSVs originais (application_train.csv, bureau.csv)
+│   ├── silver/                     # Camada Silver: application_train.parquet, bureau.parquet
+│   └── gold/                       # Camada Gold: abt_credit_risk.parquet (ABT)
 ├── models/
 │   ├── credit_risk_pipeline.joblib # Pipeline completo serializado (Pré-processamento + CatBoost - 120 KB)
 │   └── model_metrics.json          # Metadados de auditoria, métricas de teste e limiares (0.5027 / 0.6400)
 ├── notebooks/
-│   ├── 01_eda_and_abt_validation.ipynb        # Validação da ABT e sanidade da camada Gold
-│   └── 02_model_training_and_evaluation.ipynb # EDA profunda, MVP 5 Cs, modelagem e testes estatísticos
+│   ├── ELT.ipynb                   # Engenharia de Dados PySpark / Arquitetura Medalhão (Bronze -> Silver -> Gold ABT)
+│   └── EDA_modeling_pipeline.ipynb # EDA, Seleção de Features, Pipeline Scikit-Learn + CatBoost e Métricas Oficiais
 ├── outputs/                        # Gráficos de alta resolução gerados na Fase 2/3 (300 DPI)
-├── sql/
-│   └── create_abt.sql              # Query analítica DuckDB (Camada Silver -> Gold)
-├── src/
-│   └── data_prep.py                # Script de orquestração do pipeline de dados
+├── app/                            # Microsserviço FastAPI (inferência)
+│   ├── main.py                     # Endpoints: /health, /metadata, /predict, /predict/batch
+│   ├── schemas.py                  # Contratos Pydantic (payload unitário, lote e respostas)
+│   └── model.py                    # Carregamento do pipeline e lógica de predição/faixas de risco
+├── frontend/                       # Front-End corporativo (Streamlit — Mesa de Crédito)
+│   ├── app.py                      # Interface, Motor de Decisão em Dupla Camada e Hard Rules
+│   ├── Dockerfile                  # Imagem do front-end (python:3.11-slim, porta 8501)
+│   ├── requirements.txt            # Dependências do front-end
+│   └── .streamlit/
+│       └── config.toml             # Tema institucional (cores e layout)
+├── tests/
+│   └── test_api.py                 # Suíte Pytest da API
+├── Dockerfile                      # Imagem da API (porta 8000)
+├── docker-compose.yml              # Orquestração da stack completa (API + Front-End)
 ├── requirements.txt                # Dependências do projeto
 └── README.md                       # Documentação técnica e executiva (CRISP-DM)
 ```
 
 ---
 
-## 🚀 8. Instruções para Reprodução Local
+## 🔌 8. API REST (FastAPI)
+
+A API (`app/main.py`) carrega o pipeline serializado na inicialização e valida os *payloads* com **Pydantic** (`extra="forbid"`). Documentação interativa (Swagger UI) em `http://localhost:8000/docs`.
+
+| Método | Endpoint | Descrição |
+| :---: | :--- | :--- |
+| `GET` | `/health` | *Health check* e status de carga do modelo. |
+| `GET` | `/metadata` | Métricas e limiares do modelo (`model_metrics.json`). Retorna `503` se o modelo não estiver carregado. |
+| `POST` | `/predict` | Predição individual de uma proposta de crédito. |
+| `POST` | `/predict/batch` | Predição **vetorizada** de múltiplas propostas em uma única chamada. |
+
+### 8.1. `POST /predict`
+
+Recebe as 12 variáveis do MVP e retorna `probabilidade_default`, `decisao_binaria`, `faixa_risco` (`APROVADO_AUTOMATICO`, `ANALISE_ADICIONAL_OU_CONDICIONAL` ou `REPROVADO_AUTOMATICO`) e `threshold_utilizado`.
+
+### 8.2. `POST /predict/batch`
+
+Endpoint vetorizado para processamento em lote: o corpo contém a lista `applications` (mínimo de 1 item), cada qual com o mesmo contrato de `/predict`. O pipeline é executado sobre todo o lote de uma só vez, evitando o custo de uma requisição HTTP por proposta.
+
+**Requisição:**
+```json
+{
+  "applications": [
+    {
+      "EXT_SOURCE_2": 0.55,
+      "EXT_SOURCE_3": 0.50,
+      "AMT_CREDIT": 450000.0,
+      "YEARS_EMPLOYED": 6.5,
+      "AGE_YEARS": 38.0,
+      "DTI_RATIO": 0.28,
+      "AMT_INCOME_TOTAL": 180000.0,
+      "BUREAU_TOTAL_CREDIT_DEBT": 35000.0,
+      "BUREAU_ACTIVE_LOANS": 2,
+      "FLAG_OWN_CAR": 1,
+      "NAME_EDUCATION_TYPE": "Higher education",
+      "NAME_INCOME_TYPE": "Working"
+    }
+  ]
+}
+```
+
+**Resposta:** `predictions` (lista de objetos idênticos à resposta de `/predict`, na mesma ordem da entrada) e `summary`, com `total_processado` e `contagem_por_faixa` (quantidade de propostas por faixa de risco).
+
+---
+
+## 🖥️ 9. Front-End Corporativo (Streamlit — Mesa de Crédito) e Motor de Decisão em Dupla Camada
+
+O diretório `frontend/` contém a **Mesa de Crédito**, aplicação **Streamlit** que consome a API via HTTP (variável de ambiente `API_URL`; `http://api:8000` na rede do Docker Compose) e oferece:
+
+* **Simulação individual** de propostas (consumindo `/predict`), com *presets* de exemplo e *cards* de decisão por faixa de risco.
+* **Análise em lote** via upload de CSV (consumindo `/predict/batch`), com tabela de resultados contendo o **Status do Modelo** e as **Travas de Política** acionadas.
+* **Dicionário de dados** e indicadores de saúde/metadados do modelo obtidos da API.
+* Tema institucional definido em `frontend/.streamlit/config.toml`.
+
+### 9.1. Motor de Decisão em Dupla Camada
+
+A decisão final combina duas camadas independentes e auditáveis:
+
+1. **Camada 1 — Score Estatístico (CatBoost):** a API calcula a probabilidade de inadimplência e a classifica no semáforo de 3 faixas (limiares `0.5027` / `0.6400`).
+2. **Camada 2 — Travas de Política Institucional (*Hard Rules*):** o front-end aplica limites prudenciais determinísticos sobre o resultado do modelo.
+
+| Hard Rule | Condição | Efeito |
+| :--- | :--- | :--- |
+| **Desemprego** | `NAME_INCOME_TYPE = Unemployed` (Desempregado) | 🔴 Reprovação automática |
+| **Alavancagem** | `AMT_CREDIT > 10 × AMT_INCOME_TOTAL` | 🔴 Reprovação automática |
+| **DTI Mensal crítico** | `DTI_RATIO > 50%` | 🔴 Reprovação automática |
+| **DTI Mensal em alerta** | `35% < DTI_RATIO ≤ 50%` e modelo = Aprovado | 🟡 Rebaixado para análise adicional/condicional |
+
+> [!IMPORTANT]
+> A política **só pode agravar** a decisão do modelo: nunca converte uma reprovação em aprovação. Quando uma trava prevalece sobre o score, a interface exibe o aviso de **Travas de Política Acionadas** com os motivos, preservando a rastreabilidade entre o score puro e a decisão institucional.
+
+---
+
+## 🚀 10. Instruções para Reprodução Local
 
 1. **Clonagem do repositório e criação do ambiente virtual:**
    ```bash
@@ -177,10 +261,21 @@ A análise de importância de atributos corrobora a aderência do modelo aos **5
    ```
 
 2. **Execução do Pipeline de Engenharia de Dados (Camada Gold):**
-   Com os arquivos `application_train.csv` e `bureau.csv` posicionados em `data/raw/`, executar:
-   ```bash
-   python src/data_prep.py
-   ```
+   Com os arquivos `application_train.csv` e `bureau.csv` posicionados em `data/bronze/`, executar o notebook `notebooks/ELT.ipynb` (Bronze -> Silver -> Gold).
 
 3. **Inspeção do Treinamento e Testes Estatísticos:**
-   Abrir o notebook `notebooks/02_model_training_and_evaluation.ipynb` para verificação das tabelas descritivas, gráficos diagnósticos e exportação dos artefatos em `models/`.
+   Abrir o notebook `notebooks/EDA_modeling_pipeline.ipynb` para verificação das tabelas descritivas, gráficos diagnósticos e exportação dos artefatos em `models/`.
+
+4. **Execução da Stack Completa (API + Front-End) com um único comando:**
+   Com o Docker e o Docker Compose instalados, na raiz do repositório execute:
+   ```bash
+   docker compose up --build
+   ```
+   O serviço do front-end só inicia após o *healthcheck* da API ser aprovado. Após a subida, acesse:
+
+   | Serviço | URL |
+   | :--- | :--- |
+   | 🖥️ Front-End (Mesa de Crédito — Streamlit) | http://localhost:8501 |
+   | 🔌 API FastAPI (Swagger UI) | http://localhost:8000/docs |
+
+   Para encerrar e remover os contêineres: `docker compose down`.
