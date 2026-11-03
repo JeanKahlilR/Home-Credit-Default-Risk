@@ -57,8 +57,8 @@ Para processar os $307.511$ contratos principais (`application_train.csv`) em co
 
 * `BUREAU_TOTAL_LOANS` e `BUREAU_ACTIVE_LOANS`: Total de contratos registrados no birô e quantidade de contratos vigentes (`Active`).
 * `BUREAU_TOTAL_CREDIT_SUM` e `BUREAU_TOTAL_CREDIT_DEBT`: Somatório dos valores contratados e do saldo devedor atual no mercado.
-* `DTI_RATIO` (*Debt-to-Income*): Razão entre o valor da anuidade/parcela e a renda declarada ($\frac{\text{AMT\_ANNUITY}}{\text{AMT\_INCOME\_TOTAL}}$).
-* `CREDIT_INCOME_RATIO`: Razão entre o montante total solicitado e a renda anual ($\frac{\text{AMT\_CREDIT}}{\text{AMT\_INCOME\_TOTAL}}$).
+- `DTI_RATIO` (*Debt-to-Income*): Razão entre a anuidade (`AMT_ANNUITY`) e a renda total (`AMT_INCOME_TOTAL`).
+- `CREDIT_INCOME_RATIO`: Razão entre o crédito solicitado (`AMT_CREDIT`) e a renda total (`AMT_INCOME_TOTAL`).
 
 ---
 
